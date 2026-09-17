@@ -1,32 +1,19 @@
 import asyncio
 import websockets
 import json
-
 from backend.detector import extract_update
 
-
-URI = (
-    "wss://ris-live.ripe.net/v1/ws/"
-    "?client=bgp-hijack-visualizer"
-)
-
+URI = ("wss://ris-live.ripe.net/v1/ws/" "?client=bgp-hijack-visualizer")
 
 async def stop_after_seconds(seconds):
     await asyncio.sleep(seconds)
-
-    print(
-        f"\n{seconds} seconds reached. "
-        "Stopping collector..."
-    )
-
+    print(f"\n{seconds} seconds reached. " "Stopping collector...")
     raise SystemExit
-
 
 def print_data(event):
     print("\n" + "=" * 50)
     print("SUSPICIOUS BGP EVENT")
     print("=" * 50)
-
     print("Prefix:", event["prefix"])
     print("Peer ASN:", event["peer_asn"])
     print("Old origin:", event["old_origin"])
@@ -39,96 +26,43 @@ def print_data(event):
 
 
 async def collect():
-    # Connect to RIPE RIS and process live BGP updates.
     async with websockets.connect(URI) as ws:
-
         subscribe_msg = {
             "type": "ris_subscribe",
             "data": {
                 "type": "UPDATE"
             }
         }
-
-        await ws.send(
-            json.dumps(subscribe_msg)
-        )
-
+        await ws.send(json.dumps(subscribe_msg))
         print("Connected to RIPE RIS!")
 
         buffer = []
-
         try:
-            with open(
-                "data/updates.jsonl",
-                "a"
-            ) as f:
-
+            with open("data/updates.jsonl", "a") as f:
                 async for messages in ws:
-
-                    # Convert JSON string into Python dictionary
                     data = json.loads(messages)
-
-                    # Extract update and suspicious events
                     update = extract_update(data)
-
-                    # Print and save the data
                     for event in update:
-
-                        buffer.append(
-                            json.dumps(event)
-                        )
-
+                        buffer.append(json.dumps(event))
                         print_data(event)
-
                     if len(buffer) >= 50:
-
-                        f.write(
-                            "\n".join(buffer) + "\n"
-                        )
-
+                        f.write("\n".join(buffer) + "\n")
                         f.flush()
                         buffer.clear()
-
                 if buffer:
-
-                    f.write(
-                        "\n".join(buffer) + "\n"
-                    )
-
+                    f.write("\n".join(buffer) + "\n")
                     f.flush()
                     buffer.clear()
-
         finally:
-
             if buffer:
-
-                with open(
-                    "data/updates.jsonl",
-                    "a"
-                ) as f:
-
-                    f.write(
-                        "\n".join(buffer) + "\n"
-                    )
-
+                with open("data/updates.jsonl", "a") as f:
+                    f.write("\n".join(buffer) + "\n")
                     f.flush()
-
                 buffer.clear()
 
-
 async def run():
-    stop_task = asyncio.create_task(
-        stop_after_seconds(10)
-    )
-
-    collector_task = asyncio.create_task(
-        collect()
-    )
-
-    await asyncio.gather(
-        stop_task,
-        collector_task
-    )
-
+    stop_task = asyncio.create_task(stop_after_seconds(10))
+    collector_task = asyncio.create_task(collect())
+    await asyncio.gather(stop_task, collector_task)
 
 asyncio.run(run())

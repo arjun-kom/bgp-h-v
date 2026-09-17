@@ -8,19 +8,14 @@ import requests
 routing_state = defaultdict(dict)
 reported_events = set()
 
-
 # check for repeated ASN in the path
 def check_path(path):
     visited = set()
-
     for asn in path:
         if asn in visited:
             return 1
-
         visited.add(asn)
-
     return 0
-
 
 # check RPKI status
 def check_rpki(prefix, origin_asn):
@@ -32,11 +27,7 @@ def check_rpki(prefix, origin_asn):
     }
 
     try:
-        response = requests.get(
-            url,
-            params=params,
-            timeout=5
-        )
+        response = requests.get(url, params=params, timeout=5)
 
         response.raise_for_status()
 
@@ -77,9 +68,7 @@ def extract_update(data):
     announcements = []
 
     for announcement in msg["announcements"]:
-        announcements.extend(
-            announcement["prefixes"]
-        )
+        announcements.extend(announcement["prefixes"])
 
     withdrawals = msg["withdrawals"]
 
@@ -89,14 +78,10 @@ def extract_update(data):
     # Check every announced prefix separately
     for prefix in announcements:
 
-        old_origin = routing_state[prefix].get(
-            peer_asn
-        )
+        old_origin = routing_state[prefix].get(peer_asn)
 
         # Origins already known from other peers
-        known_origins = set(
-            routing_state[prefix].values()
-        )
+        known_origins = set(routing_state[prefix].values())
 
         score = check_path(path)
 
@@ -117,17 +102,12 @@ def extract_update(data):
         ):
 
             if same_peer_origin_change:
-                print(
-                    "\nSame-peer origin change detected"
-                )
+                print("\nSame-peer origin change detected")
 
                 score += 3
 
             elif new_peer_different_origin:
-                print(
-                    "\nNew peer with different origin detected"
-                )
-
+                print("\nNew peer with different origin detected")
                 score += 2
 
             print("Prefix:", prefix)
@@ -148,12 +128,7 @@ def extract_update(data):
 
             if score > 0:
 
-                event_key = (
-                    prefix,
-                    old_origin,
-                    origin_asn,
-                    peer_asn
-                )
+                event_key = (prefix, old_origin, origin_asn, peer_asn)
 
                 if event_key not in reported_events:
 
@@ -179,17 +154,10 @@ def extract_update(data):
 
     # Process withdrawals
     for prefix in withdrawals:
-
         if prefix not in routing_state:
             continue
-
-        routing_state[prefix].pop(
-            peer_asn,
-            None
-        )
-
+        routing_state[prefix].pop(peer_asn, None)
         # Remove the prefix completely if no peers remain
         if not routing_state[prefix]:
             del routing_state[prefix]
-
     return events
