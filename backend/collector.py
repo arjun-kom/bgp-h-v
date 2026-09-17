@@ -61,7 +61,7 @@ async def collect():
                 buffer.clear()
 
 async def run():
-    stop_task = asyncio.create_task(stop_after_seconds(10))
+    stop_task = asyncio.create_task(stop_after_seconds(60))
     collector_task = asyncio.create_task(collect())
     await asyncio.gather(stop_task, collector_task)
 
