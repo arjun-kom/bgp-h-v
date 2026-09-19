@@ -2,6 +2,7 @@ import asyncio
 import websockets
 import json
 from backend.detector import extract_update
+from backend.database import insert_event
 
 URI = ("wss://ris-live.ripe.net/v1/ws/" "?client=bgp-hijack-visualizer")
 
@@ -26,7 +27,7 @@ def print_data(event):
 
 
 async def collect():
-    async with websockets.connect(URI) as ws:
+    async with websockets.connect(URI, ping_interval=20, ping_timeout=60) as ws:
         subscribe_msg = {
             "type": "ris_subscribe",
             "data": {
@@ -36,29 +37,12 @@ async def collect():
         await ws.send(json.dumps(subscribe_msg))
         print("Connected to RIPE RIS!")
 
-        buffer = []
-        try:
-            with open("data/updates.jsonl", "a") as f:
-                async for messages in ws:
-                    data = json.loads(messages)
-                    update = extract_update(data)
-                    for event in update:
-                        buffer.append(json.dumps(event))
-                        print_data(event)
-                    if len(buffer) >= 50:
-                        f.write("\n".join(buffer) + "\n")
-                        f.flush()
-                        buffer.clear()
-                if buffer:
-                    f.write("\n".join(buffer) + "\n")
-                    f.flush()
-                    buffer.clear()
-        finally:
-            if buffer:
-                with open("data/updates.jsonl", "a") as f:
-                    f.write("\n".join(buffer) + "\n")
-                    f.flush()
-                buffer.clear()
+        async for messages in ws:
+            data = json.loads(messages)
+            update = extract_update(data)
+            for event in update:
+                insert_event(event)
+                print_data(event)
 
 async def run():
     stop_task = asyncio.create_task(stop_after_seconds(60))
